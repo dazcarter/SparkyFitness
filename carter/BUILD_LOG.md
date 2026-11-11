@@ -44,4 +44,4 @@
 - 19:27 (Darren OK'd) Re-added Proxmox `pve-cert-renew` key to OPNsense root (config.xml backup `…-1927-pvekey`,
   `from="192.168.0.2"`). pve-cert-renew + tracker-cert-sync ran clean; Proxmox UI and tracker certs valid to 8 Feb 2027.
 - Darren tested search/barcode and phone sync. Added git remote `fork` = git@github.com:dazcarter/SparkyFitness.git;
-  fork not created yet (no browser signed in to GitHub).
+  Darren created the fork; `carter` pushed to https://github.com/dazcarter/SparkyFitness (tracks `fork/carter`).
