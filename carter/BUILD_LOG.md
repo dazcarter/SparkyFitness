@@ -41,3 +41,7 @@
   (FamilyMeal recipes). One-file patch `patches/swissfood-lan.patch` lets the Swiss provider reach the bridge on the compose
   network. Tested on the test stack via /api/v2/foods/search, deployed, added both to Darren's account, switched off
   Swiss/Canadian/Swedish/NIH supplement providers (Darren asked). Emulation paths 404 from outside.
+- 19:27 (Darren OK'd) Re-added Proxmox `pve-cert-renew` key to OPNsense root (config.xml backup `…-1927-pvekey`,
+  `from="192.168.0.2"`). pve-cert-renew + tracker-cert-sync ran clean; Proxmox UI and tracker certs valid to 8 Feb 2027.
+- Darren tested search/barcode and phone sync. Added git remote `fork` = git@github.com:dazcarter/SparkyFitness.git;
+  fork not created yet (no browser signed in to GitHub).

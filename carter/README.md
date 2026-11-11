@@ -97,10 +97,10 @@ left untouched on purpose).
 The cert is OPNsense's ACME cert (Cloudflare DNS-01), shared with meals/ha/pve. Copied in by hand on 2026-11-11,
 valid to 8 Feb 2027. Automatic renewal path: OPNsense → `pve-cert-renew.sh` (Proxmox, 03:00) →
 `tracker-cert-sync.sh` (Proxmox, 03:15, `/etc/cron.d/tracker-cert-sync`) → CT 107 + nginx reload.
-**Blocked until** the Proxmox host's `pve-cert-renew` key is authorised on OPNsense again (it has been rejected
-since early Oct, which is also why the Proxmox web UI cert expired 28 Oct). Fix: OPNsense → System → Access →
-Users → root → Authorized keys, add the line from `cat /root/.ssh/id_opnsense.pub` on Proxmox (optionally prefixed
-`from="192.168.0.2" `), then run `/usr/local/bin/pve-cert-renew.sh && /usr/local/bin/tracker-cert-sync.sh`.
+Working again since 2026-11-11: the Proxmox `id_opnsense.pub` key (`pve-cert-renew@carterhome`, restricted
+`from="192.168.0.2"`) was re-added to OPNsense root's authorized keys in `config.xml` (backup
+`/conf/config.xml.bak-20261111-1927-pvekey`). If renewal breaks again, check
+`ssh -i /root/.ssh/id_opnsense root@192.168.0.1 echo ok` from Proxmox.
 
 ## Backups
 
