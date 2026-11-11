@@ -1,0 +1,40 @@
+# SparkyFitness (tracker.carterhome.com.au) sensors for Home Assistant.
+# Install: copy to /config/packages/tracker.yaml, add the secrets below, then
+# Developer tools > YAML > "REST entities and notify services" reload (no HA restart needed
+# if packages are already enabled; otherwise one restart).
+#
+# secrets.yaml:
+#   tracker_api_key_darren_header: "Bearer <API key from SparkyFitness > Settings > API keys, read-only>"
+#
+# One rest: block per person; copy it and swap the secret + names for Breeahn etc.
+rest:
+  - resource_template: "https://tracker.carterhome.com.au/api/daily-summary?date={{ now().strftime('%Y-%m-%d') }}"
+    headers:
+      Authorization: !secret tracker_api_key_darren_header
+    scan_interval: 900
+    sensor:
+      - name: "Darren calories eaten today"
+        unique_id: tracker_darren_calories_eaten
+        value_template: "{{ value_json.calorieBalance.eaten | round(0) }}"
+        unit_of_measurement: kcal
+        state_class: measurement
+      - name: "Darren calories remaining"
+        unique_id: tracker_darren_calories_remaining
+        value_template: "{{ value_json.calorieBalance.remaining | round(0) }}"
+        unit_of_measurement: kcal
+        state_class: measurement
+      - name: "Darren calorie goal"
+        unique_id: tracker_darren_calorie_goal
+        value_template: "{{ value_json.calorieBalance.goal | round(0) }}"
+        unit_of_measurement: kcal
+  - resource: "https://tracker.carterhome.com.au/api/measurements/most-recent/weight"
+    headers:
+      Authorization: !secret tracker_api_key_darren_header
+    scan_interval: 3600
+    sensor:
+      - name: "Darren weight"
+        unique_id: tracker_darren_weight
+        value_template: "{{ value_json.weight }}"
+        unit_of_measurement: kg
+        device_class: weight
+        state_class: measurement

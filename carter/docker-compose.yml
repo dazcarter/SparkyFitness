@@ -1,0 +1,88 @@
+# Carter household deployment of SparkyFitness (CT 107, /opt/tracker).
+# Upstream images are used unmodified; household additions live in this folder only.
+# Secrets come from .env next to this file (never committed). See carter/README.md.
+name: tracker
+
+services:
+  sparkyfitness-db:
+    image: postgres:18.3-alpine
+    container_name: sparkyfitness-db
+    restart: always
+    environment:
+      POSTGRES_DB: sparkyfitness_db
+      POSTGRES_USER: sparky
+      POSTGRES_PASSWORD: ${SPARKY_FITNESS_DB_PASSWORD:?}
+    volumes:
+      - ./data/postgresql:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sparky -d sparkyfitness_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  sparkyfitness-server:
+    image: codewithcj/sparkyfitness_server:${SPARKY_VERSION:-v1.12.1}
+    restart: always
+    environment:
+      SPARKY_FITNESS_DB_HOST: sparkyfitness-db
+      SPARKY_FITNESS_DB_PORT: 5432
+      SPARKY_FITNESS_DB_NAME: sparkyfitness_db
+      SPARKY_FITNESS_DB_USER: sparky
+      SPARKY_FITNESS_DB_PASSWORD: ${SPARKY_FITNESS_DB_PASSWORD:?}
+      SPARKY_FITNESS_APP_DB_USER: sparky_app
+      SPARKY_FITNESS_APP_DB_PASSWORD: ${SPARKY_FITNESS_APP_DB_PASSWORD:?}
+      SPARKY_FITNESS_FRONTEND_URL: https://tracker.carterhome.com.au
+      SPARKY_FITNESS_API_ENCRYPTION_KEY: ${SPARKY_FITNESS_API_ENCRYPTION_KEY:?}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?}
+      NODE_ENV: production
+      TZ: Australia/Perth
+      SPARKY_FITNESS_LOG_LEVEL: ${SPARKY_FITNESS_LOG_LEVEL:-WARN}
+      SPARKY_FITNESS_DISABLE_SIGNUP: ${SPARKY_FITNESS_DISABLE_SIGNUP:-false}
+      SPARKY_FITNESS_ADMIN_EMAIL: ${SPARKY_FITNESS_ADMIN_EMAIL:-}
+      SPARKY_FITNESS_TRUSTED_PROXY_HOPS: 2
+    volumes:
+      - ./data/backup:/app/SparkyFitnessServer/backup
+      - ./data/uploads:/app/SparkyFitnessServer/uploads
+    depends_on:
+      sparkyfitness-db:
+        condition: service_healthy
+
+  sparkyfitness-frontend:
+    image: codewithcj/sparkyfitness:${SPARKY_VERSION:-v1.12.1}
+    restart: always
+    environment:
+      SPARKY_FITNESS_FRONTEND_URL: https://tracker.carterhome.com.au
+      SPARKY_FITNESS_SERVER_HOST: sparkyfitness-server
+      SPARKY_FITNESS_SERVER_PORT: 3010
+    depends_on:
+      - sparkyfitness-server
+
+  familymeal-bridge:
+    build: ./familymeal-bridge
+    restart: always
+    environment:
+      TZ: Australia/Perth
+      SPARKY_INTERNAL_URL: http://sparkyfitness-server:3010
+      FAMILYMEAL_URL: ${FAMILYMEAL_URL:-https://meals.carterhome.com.au}
+      # Either a FamilyMeal email+password, or a family-member user id (FamilyMeal's one-tap login).
+      FAMILYMEAL_EMAIL: ${FAMILYMEAL_EMAIL:-}
+      FAMILYMEAL_PASSWORD: ${FAMILYMEAL_PASSWORD:-}
+      FAMILYMEAL_USER_ID: ${FAMILYMEAL_USER_ID:-}
+    volumes:
+      - ./data/bridge:/data
+    depends_on:
+      - sparkyfitness-server
+
+  proxy:
+    image: nginx:1.29-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/tracker.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - sparkyfitness-frontend
+      - familymeal-bridge

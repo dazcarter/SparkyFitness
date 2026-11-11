@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FamilyMeal recipes</title>
+<style>
+  :root { --bg:#f7f7f5; --card:#fff; --ink:#1c1c1a; --muted:#6b6b66; --line:#e4e4df; --accent:#2f7d4f; --warn:#b26b00; --warnbg:#fff4e0; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151514; --card:#1f1f1d; --ink:#ececea; --muted:#a3a39d; --line:#33332f; --accent:#5cbf86; --warn:#f0a63a; --warnbg:#3a2a10; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+  header { position:sticky; top:0; z-index:2; background:var(--card); border-bottom:1px solid var(--line); padding:10px 16px; display:flex; gap:10px; align-items:center; }
+  header h1 { font-size:17px; margin:0; flex:1; }
+  header a { color:var(--accent); text-decoration:none; font-weight:600; }
+  main { max-width:760px; margin:0 auto; padding:16px; }
+  input, select, button { font:inherit; color:inherit; }
+  input, select { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:9px 10px; min-width:0; }
+  button { border:0; border-radius:8px; padding:9px 14px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); }
+  button:disabled { opacity:.5; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .grow { flex:1; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin:10px 0; }
+  .list .card { cursor:pointer; display:flex; justify-content:space-between; gap:10px; align-items:center; }
+  .muted { color:var(--muted); font-size:13px; }
+  .badge { display:inline-block; font-size:12px; padding:2px 8px; border-radius:99px; background:var(--warnbg); color:var(--warn); font-weight:600; white-space:nowrap; }
+  .macros { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; text-align:center; margin:8px 0; }
+  .macros div { background:var(--bg); border-radius:8px; padding:8px 4px; }
+  .macros b { display:block; font-size:18px; }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:8px 4px; border-top:1px solid var(--line); vertical-align:top; }
+  td.n { text-align:right; white-space:nowrap; }
+  tr.line { cursor:pointer; }
+  tr.weak td:first-child { border-left:3px solid var(--warn); padding-left:8px; }
+  .editor { background:var(--bg); }
+  .hit { padding:8px; border-radius:8px; cursor:pointer; }
+  .hit:hover, .hit:focus { background:var(--card); outline:1px solid var(--line); }
+  .msg { padding:10px 12px; border-radius:8px; background:var(--warnbg); color:var(--warn); }
+  .ok { background:color-mix(in srgb, var(--accent) 15%, transparent); color:var(--accent); }
+  img.thumb { width:56px; height:56px; object-fit:cover; border-radius:8px; flex:none; }
+</style>
+</head>
+<body>
+<header><h1 id="title">FamilyMeal recipes</h1><a href="/">← Tracker</a></header>
+<main id="app"><p class="muted">Loading…</p></main>
+<script>
+const API = '/familymeal/api';
+const $app = document.getElementById('app');
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const k = (n) => Math.round(n);
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { $app.innerHTML = `<div class="card">Sign in to the <a href="/">tracker</a> first, then come back here.</div>`; throw new Error('401'); }
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+const macros = (n, label = '') => `<div class="macros">
+  <div><b>${k(n.kcal)}</b><span class="muted">kcal${label}</span></div><div><b>${k(n.protein)}g</b><span class="muted">protein</span></div>
+  <div><b>${k(n.carbs)}g</b><span class="muted">carbs</span></div><div><b>${k(n.fat)}g</b><span class="muted">fat</span></div></div>`;
+
+async function showList(qs = '') {
+  document.getElementById('title').textContent = 'FamilyMeal recipes';
+  const me = await api('/me');
+  $app.innerHTML = `<div class="row"><input id="q" class="grow" placeholder="Search recipes" value="${esc(qs)}" autocomplete="off">
+    <button class="ghost" id="sync">Re-sync</button></div>
+    <p class="muted" id="st">${me.sync.running ? 'Syncing from FamilyMeal…' : me.sync.lastRun ? `Last synced ${new Date(me.sync.lastRun).toLocaleString()}` : ''}
+    ${me.sync.lastError ? ` — <span class="badge">${esc(me.sync.lastError)}</span>` : ''}</p><div class="list" id="list"></div>`;
+  const q = document.getElementById('q');
+  let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => load(q.value), 200); };
+  document.getElementById('sync').onclick = async () => { await api('/sync', { method: 'POST' }); document.getElementById('st').textContent = 'Syncing from FamilyMeal… (a few minutes for changed recipes)'; };
+  async function load(s) {
+    history.replaceState(null, '', s ? `#q=${encodeURIComponent(s)}` : '#');
+    const rs = await api('/recipes?q=' + encodeURIComponent(s));
+    document.getElementById('list').innerHTML = rs.length ? rs.map((r) => `<div class="card" data-id="${esc(r.id)}">
+      ${r.imageUrl ? `<img class="thumb" src="${esc(r.imageUrl.startsWith('http') ? r.imageUrl : '')}" alt="" onerror="this.remove()">` : ''}
+      <div class="grow"><b>${esc(r.title)}</b><div class="muted">${k(r.perServing.kcal)} kcal · ${k(r.perServing.protein)}g protein per serving · serves ${r.servings}</div></div>
+      ${r.needsReview ? `<span class="badge">${r.needsReview} to check</span>` : ''}</div>`).join('')
+      : `<p class="muted">${me.sync.running ? 'Recipes are still syncing — try again in a minute.' : 'No recipes found.'}</p>`;
+    document.querySelectorAll('[data-id]').forEach((el) => el.onclick = () => { location.hash = '#r=' + el.dataset.id; });
+  }
+  await load(qs); q.focus();
+}
+
+async function showRecipe(id) {
+  let v = await api('/recipes/' + encodeURIComponent(id));
+  const today = new Date().toLocaleDateString('en-CA');
+  const hr = new Date().getHours();
+  const meal = hr < 10 ? 'breakfast' : hr < 15 ? 'lunch' : hr < 21 ? 'dinner' : 'snacks';
+  function render(msg = '') {
+    document.getElementById('title').textContent = v.title;
+    $app.innerHTML = `<p><a href="#" class="muted">← All recipes</a></p>
+    <div class="card"><b>Per serving</b> <span class="muted">(recipe serves ${v.servings})</span>${macros(v.perServing)}
+      <div class="row"><label>Portions <input id="por" type="number" inputmode="decimal" min="0.1" max="20" step="0.1" value="1" style="width:90px"></label>
+      <select id="meal">${['breakfast','lunch','dinner','snacks'].map((m) => `<option ${m === meal ? 'selected' : ''}>${m}</option>`).join('')}</select>
+      <input id="date" type="date" value="${today}">
+      <button id="log" class="grow">Log it</button></div>
+      <p class="muted" id="preview"></p>${msg}</div>
+    ${v.needsReview ? `<p class="msg">${v.needsReview} ingredient${v.needsReview > 1 ? 's are' : ' is'} a guess (marked in orange). Tap a line to check it — your fix is remembered for that ingredient in every recipe.</p>` : ''}
+    <div class="card"><div class="row"><b class="grow">Ingredients</b><button class="ghost" id="refresh">Refresh from FamilyMeal</button></div>
+    <table>${v.lines.map((l) => `<tr class="line ${l.review ? 'weak' : ''}" data-ing="${esc(l.id)}">
+      <td>${esc(l.amount)} ${esc(l.unit || '')} ${esc(l.item)}<div class="muted">→ ${esc(l.match?.name || 'no match')} · ${esc(l.match?.how || '')}${l.match?.source === 'off' ? ' · Open Food Facts' : ''}</div></td>
+      <td class="n">${k(l.nutrition.kcal)} kcal</td></tr>
+      <tr hidden data-ed="${esc(l.id)}"><td colspan="2" class="editor"></td></tr>`).join('')}
+    <tr><td><b>Whole recipe</b></td><td class="n"><b>${k(v.total.kcal)} kcal</b></td></tr></table></div>`;
+    const por = document.getElementById('por');
+    const prev = () => { const p = Number(por.value) || 0; document.getElementById('preview').textContent = `${p} portion${p === 1 ? '' : 's'} = ${k(v.perServing.kcal * p)} kcal, ${k(v.perServing.protein * p)}g protein, ${k(v.perServing.carbs * p)}g carbs, ${k(v.perServing.fat * p)}g fat`; };
+    por.oninput = prev; prev();
+    document.getElementById('log').onclick = async (e) => {
+      e.target.disabled = true;
+      try {
+        const r = await api(`/recipes/${encodeURIComponent(v.id)}/log`, { method: 'POST', body: { portions: Number(por.value), meal_type: document.getElementById('meal').value, date: document.getElementById('date').value } });
+        render(`<p class="msg ok">Logged ${r.portions} × ${esc(v.title)} to ${r.meal} on ${r.date} (${k(r.logged.kcal)} kcal).</p>`);
+      } catch (err) { if (err.message !== '401') render(`<p class="msg">${esc(err.message)}</p>`); }
+    };
+    document.getElementById('refresh').onclick = async () => { v = await api(`/recipes/${encodeURIComponent(v.id)}/refresh`, { method: 'POST' }); render('<p class="msg ok">Refreshed from FamilyMeal.</p>'); };
+    document.querySelectorAll('tr.line').forEach((tr) => tr.onclick = () => edit(tr.dataset.ing));
+  }
+  function edit(ingId) {
+    const l = v.lines.find((x) => x.id === ingId);
+    const row = document.querySelector(`[data-ed="${CSS.escape(ingId)}"]`);
+    if (!row.hidden) { row.hidden = true; return; }
+    row.hidden = false;
+    const cell = row.firstElementChild;
+    cell.innerHTML = `<div class="row"><label>Grams <input id="g" type="number" inputmode="decimal" min="0" step="1" value="${Math.round(l.match?.grams ?? 0)}" style="width:100px"></label>
+      <button id="gs">Save grams</button></div>
+      <div class="row" style="margin-top:8px"><input id="s" class="grow" placeholder="Search a better match" value="${esc(l.item.split(',')[0])}"><button id="go" class="ghost">Search</button></div>
+      <div id="hits" class="muted">Pick a food below. AUSNUT (Australian) first, then Open Food Facts.</div>
+      <details style="margin-top:6px"><summary class="muted">Or enter values per 100 g</summary>
+      <div class="row">${['kcal','protein','carbs','fat'].map((f) => `<input id="c_${f}" type="number" step="0.1" min="0" placeholder="${f}" style="width:80px">`).join('')}
+      <button id="cs">Use these</button></div></details>`;
+    const g = cell.querySelector('#g');
+    const save = async (body) => { v = await api(`/recipes/${encodeURIComponent(v.id)}/lines/${encodeURIComponent(ingId)}`, { method: 'PUT', body: { grams: Number(g.value), ...body } }); render('<p class="msg ok">Saved.</p>'); };
+    cell.querySelector('#gs').onclick = () => save({});
+    cell.querySelector('#cs').onclick = () => save({ source: 'custom', name: cell.querySelector('#s').value || l.item,
+      per100: Object.fromEntries(['kcal','protein','carbs','fat'].map((f) => [f, Number(cell.querySelector('#c_' + f).value || 0)])) });
+    const search = async () => {
+      const hits = cell.querySelector('#hits'); hits.textContent = 'Searching…';
+      const rs = await api('/nutrition-search?q=' + encodeURIComponent(cell.querySelector('#s').value));
+      hits.innerHTML = rs.map((h, i) => `<div class="hit" tabindex="0" data-i="${i}"><b>${esc(h.name)}</b>
+        <span class="muted">${h.source === 'ausnut' ? 'AUSNUT' : 'Open Food Facts'} · per 100 g: ${k(h.per100.kcal)} kcal, P ${k(h.per100.protein)} C ${k(h.per100.carbs)} F ${k(h.per100.fat)}</span></div>`).join('') || 'Nothing found.';
+      hits.querySelectorAll('.hit').forEach((el) => el.onclick = () => { const h = rs[el.dataset.i]; save({ source: h.source, ref: h.ref, name: h.name, per100: h.per100 }); });
+    };
+    cell.querySelector('#go').onclick = search;
+    cell.querySelector('#s').onkeydown = (e) => { if (e.key === 'Enter') search(); };
+  }
+  render();
+}
+
+async function router() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  try { h.get('r') ? await showRecipe(h.get('r')) : await showList(h.get('q') || ''); }
+  catch (e) { if (e.message !== '401') $app.innerHTML = `<p class="msg">${esc(e.message)}</p>`; }
+}
+addEventListener('hashchange', () => { if (!location.hash.startsWith('#q=')) router(); });
+router();
+</script>
+</body>
+</html>
