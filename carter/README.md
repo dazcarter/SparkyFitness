@@ -83,10 +83,20 @@ No data is imported into SparkyFitness; the bridge answers live, like any other 
 - The service's system prompt (edit in Admin → Global AI Settings) tells it to web-search restaurant/brand foods
   missing from the databases.
 
+## Claude app connector (public, MCP + sign-in only) — 2026-11-12
+
+- Public DNS `tracker.carterhome.com.au` CNAME → `ha-tunnel` (cloudflared-ha in CT 103, 192.168.0.50); tunnel ingress
+  → `https://192.168.0.52` (no TLS verify). LAN/VPN still resolve to .52 via AdGuard, unchanged.
+- nginx (`nginx/tracker.conf`, `geo $from_tunnel`) lets tunnel traffic reach only `/mcp`, `/.well-known/`,
+  `/api/auth/`, `/api/identity/`, `/login`, `/oauth/consent` and static assets; everything else 404.
+- Remote MCP OAuth on (`global_settings.mcp_oauth_enabled`), redirects limited to Claude's two callbacks.
+  Approved apps: Settings → Connected MCP Applications (revoke there).
+- Undo: delete the DNS record, remove the tracker entry from ha-tunnel (backup `/root/ha-tunnel-config-bak-20261112.json`
+  on Proxmox), set `mcp_oauth_enabled=false`. Cloudflare token (tunnel edit) in `/root/.cf_tunnel_token` on Proxmox.
+
 ## Claude on Darren's PC (MCP)
 
-- SparkyFitness serves MCP at `https://tracker.carterhome.com.au/mcp` (LAN/VPN only, so claude.ai / phone
-  connectors can't reach it).
+- SparkyFitness serves MCP at `https://tracker.carterhome.com.au/mcp`.
 - Full-access API key "Claude on Darren PC (MCP)", no expiry, created 2026-11-11 for Darren. Stored only on the PC:
   `~/.config/sparky/mcp-key`, Claude Code user config (`~/.claude.json`, server `sparky`), and
   `~/.config/Claude/claude_desktop_config.json` (via `npx mcp-remote`). Revoke in Settings → API Key Management.

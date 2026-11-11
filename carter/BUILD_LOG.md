@@ -52,3 +52,4 @@
 - Phone app: 10-min capture showed no requests from the phone at all (not reaching the tracker).
 - 21:3x Darren added a Claude (Anthropic) global AI service. Patched chatService.ts (patches/anthropic-websearch.patch) so Claude gets web search; live test with the stored key found Betty's nutrition. Service system prompt set to web-search missing restaurant foods. Backup /root/tracker-pre-websearch-*.tgz in CT 107.
 - 21:5x Sparky MCP connected to Claude Code + Claude Desktop on Darren's PC (new full-access key, never displayed; configs backed up as *.bak-20261111-sparky). Claude Code: sparky ✔ Connected.
+- 2026-11-12 Darren OK'd public Claude connector: tracker hostname on ha-tunnel (API token), Darren added DNS CNAME, nginx limits tunnel to MCP + OAuth sign-in, MCP OAuth on (Claude callbacks only). Verified via Cloudflare: /, /api/*, /familymeal 404; /mcp 401 with resource metadata; foreign redirect refused.
