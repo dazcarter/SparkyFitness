@@ -14,6 +14,7 @@ services:
     volumes: !override
       - ./test-data/backup:/app/SparkyFitnessServer/backup
       - ./test-data/uploads:/app/SparkyFitnessServer/uploads
+      - ./patched/swissFoodService.ts:/app/SparkyFitnessServer/integrations/swissfood/swissFoodService.ts:ro
   sparkyfitness-frontend:
     environment:
       SPARKY_FITNESS_FRONTEND_URL: http://localhost:18080

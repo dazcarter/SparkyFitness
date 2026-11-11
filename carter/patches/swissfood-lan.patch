@@ -1,0 +1,45 @@
+diff --git a/SparkyFitnessServer/integrations/swissfood/swissFoodService.ts b/SparkyFitnessServer/integrations/swissfood/swissFoodService.ts
+index 80e492c59..237800ea5 100644
+--- a/SparkyFitnessServer/integrations/swissfood/swissFoodService.ts
++++ b/SparkyFitnessServer/integrations/swissfood/swissFoodService.ts
+@@ -7,7 +7,27 @@ import { mapStandardNutrientsByCode } from '../../utils/standardNutrientCodes.js
+ 
+ // The base URL is configurable per provider; route outbound requests through
+ // the shared public-host guard.
+-const guardedFetch = createGuardedFetch(PUBLIC_ONLY_AI_NETWORK_POLICY);
++const publicFetch = createGuardedFetch(PUBLIC_ONLY_AI_NETWORK_POLICY);
++
++// Carter household patch (carter/patches): let a Swiss-format provider point at a
++// food-composition service on the compose network (the AUSNUT bridge). Only hosts
++// listed in SPARKY_LAN_FOOD_HOSTS skip the public-only guard.
++const LAN_FOOD_HOSTS = (process.env.SPARKY_LAN_FOOD_HOSTS || '')
++  .split(',')
++  .map((h) => h.trim())
++  .filter(Boolean);
++const LAN_FOOD_BRAND = process.env.SPARKY_LAN_FOOD_BRAND || 'AUSNUT 2023';
++function isLanFoodUrl(url: string): boolean {
++  try {
++    return LAN_FOOD_HOSTS.includes(new URL(url).hostname);
++  } catch {
++    return false;
++  }
++}
++const guardedFetch = ((input: RequestInfo | URL, init?: RequestInit) =>
++  isLanFoodUrl(String(input))
++    ? fetch(input, init)
++    : publicFetch(input, init)) as typeof fetch;
+ 
+ const DEFAULT_BASE_URL =
+   'https://api.webapp.prod.blv.foodcase-services.com/BLV_WebApp_WS/webresources/BLV-api';
+@@ -269,7 +289,10 @@ export async function getSwissFoodDetails(
+     }
+ 
+     const foodDetail = (await response.json()) as SwissFoodDetail;
+-    return mapSwissFood(foodDetail);
++    const mapped = mapSwissFood(foodDetail);
++    return isLanFoodUrl(url)
++      ? { ...mapped, brand: LAN_FOOD_BRAND, is_custom: false }
++      : mapped;
+   } catch (error) {
+     const msg = error instanceof Error ? error.message : String(error);
+     log('error', `Error fetching Swiss Food details: ${msg}`);

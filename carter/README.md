@@ -41,6 +41,35 @@ measurements, barcode scanning (Open Food Facts), calorie/macro targets, exercis
   keep their own snapshot; the next log uses the new values.
 - Tests: `node familymeal-bridge/test/nutrition.test.mjs`.
 
+## AUSNUT and FamilyMeal in SparkyFitness's own food search
+
+No data is imported into SparkyFitness; the bridge answers live, like any other food provider.
+
+- **AUSNUT 2023**: provider type *Swiss Food Database*, renamed "AUSNUT 2023", base URL
+  `http://familymeal-bridge:8080/familymeal/ausnut`. The bridge speaks the Swiss API format (per 100 g).
+  Upstream only lets that provider call public addresses, so `patches/swissfood-lan.patch` (mounted over the
+  image's `swissFoodService.ts`) lets hosts in `SPARKY_LAN_FOOD_HOSTS` through and brands them "AUSNUT 2023".
+  The UI has no base-URL field for this type, so add it for a new person with SQL / the repository (see below).
+- **FamilyMeal**: provider type *Mealie*, base URL `http://familymeal-bridge:8080/familymeal/mealie`, any API key
+  (e.g. `not-used`). Per-serving values come from the bridge's matching and corrections. Works for non-admins
+  because `ALLOW_PRIVATE_NETWORK_FOOD_PROVIDERS=true`.
+- `/familymeal/ausnut/*` and `/familymeal/mealie/*` are blocked in nginx (404 from outside the compose network).
+- Darren's account has both (added 2026-11-11), and Swiss/Canadian/Swedish/NIH supplement providers switched off.
+- Add both for another person (run in `/opt/tracker`, replace NAME):
+  ```sh
+  U=$(docker exec sparkyfitness-db psql -U sparky -d sparkyfitness_db -tAc "select id from public.\"user\" where name='NAME'")
+  docker compose exec -T -e U=$U sparkyfitness-server node --import tsx --input-type=module -e '
+  const r = await import("/app/SparkyFitnessServer/models/externalProviderRepository.ts");
+  await r.createExternalDataProvider({ user_id: process.env.U, provider_name: "AUSNUT 2023", provider_type: "swissfood", base_url: "http://familymeal-bridge:8080/familymeal/ausnut", is_active: true });
+  await r.createExternalDataProvider({ user_id: process.env.U, provider_name: "FamilyMeal", provider_type: "mealie", base_url: "http://familymeal-bridge:8080/familymeal/mealie", app_key: "not-used", is_active: true });
+  process.exit(0);'
+  ```
+- After changing `SPARKY_VERSION`: `scripts/apply-patches.sh && docker compose up -d --force-recreate sparkyfitness-server`.
+  If the patch fails, upstream changed that file. Upstreaming "honour the private-network setting for Swiss/CNF
+  custom URLs" would let the patch go.
+- Single-file bind mounts (`nginx/tracker.conf`, `patched/*.ts`) need `--force-recreate` on that service after the
+  file is replaced, or the container keeps the old file.
+
 ## Phone setup (each person)
 
 1. Connect to home Wi-Fi or WireGuard, open https://tracker.carterhome.com.au, **Sign Up**.

@@ -41,9 +41,16 @@ services:
       SPARKY_FITNESS_DISABLE_SIGNUP: ${SPARKY_FITNESS_DISABLE_SIGNUP:-false}
       SPARKY_FITNESS_ADMIN_EMAIL: ${SPARKY_FITNESS_ADMIN_EMAIL:-}
       SPARKY_FITNESS_TRUSTED_PROXY_HOPS: 2
+      # Recipe providers (FamilyMeal via the bridge's Mealie-format API) may use LAN addresses for every user.
+      ALLOW_PRIVATE_NETWORK_FOOD_PROVIDERS: "true"
+      # Read by carter/patches/swissfood-lan.patch: AUSNUT served by the bridge in Swiss-API format.
+      SPARKY_LAN_FOOD_HOSTS: familymeal-bridge
+      SPARKY_LAN_FOOD_BRAND: AUSNUT 2023
     volumes:
       - ./data/backup:/app/SparkyFitnessServer/backup
       - ./data/uploads:/app/SparkyFitnessServer/uploads
+      # Built by scripts/apply-patches.sh from the pinned image + carter/patches (rerun after changing SPARKY_VERSION).
+      - ./patched/swissFoodService.ts:/app/SparkyFitnessServer/integrations/swissfood/swissFoodService.ts:ro
     depends_on:
       sparkyfitness-db:
         condition: service_healthy

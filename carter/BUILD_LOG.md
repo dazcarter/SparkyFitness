@@ -36,3 +36,8 @@
   A dedicated FamilyMeal account with email+password is better; set `FAMILYMEAL_EMAIL`/`FAMILYMEAL_PASSWORD`.
 - Sign-up is open on the tracker (LAN/VPN only). After the family has accounts, set
   `SPARKY_FITNESS_DISABLE_SIGNUP=true` in `/opt/tracker/.env` and `docker compose up -d`.
+
+- 09:5x Food search providers: bridge now also answers in Swiss-API format (AUSNUT, per 100 g) and Mealie format
+  (FamilyMeal recipes). One-file patch `patches/swissfood-lan.patch` lets the Swiss provider reach the bridge on the compose
+  network. Tested on the test stack via /api/v2/foods/search, deployed, added both to Darren's account, switched off
+  Swiss/Canadian/Swedish/NIH supplement providers (Darren asked). Emulation paths 404 from outside.

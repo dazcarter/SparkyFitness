@@ -240,13 +240,48 @@ const todayPerth = () => new Date().toLocaleDateString('en-CA', { timeZone: ENV.
 async function route(req, res) {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname.replace(/^\/familymeal/, '') || '/';
+  let m;
   if (p === '/' || p === '/index.html') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(INDEX); }
   if (p === '/health') return json(res, 200, { ok: true, ...status });
+
+  // ---- Provider emulation for SparkyFitness's own food search (compose network only; nginx blocks these).
+  // AUSNUT in the Swiss Food Composition Database API shape (per 100 g; see carter/patches/swissfood-lan.patch).
+  if (p === '/ausnut/foods') {
+    const limit = Math.min(Number(url.searchParams.get('limit')) || 20, 50);
+    const offset = Number(url.searchParams.get('offset')) || 0;
+    const hits = N.searchAusnut(url.searchParams.get('search') || '', offset + limit).slice(offset);
+    return json(res, 200, hits.map((h) => ({ id: Number(h.ref), foodid: Number(h.ref), foodName: h.name, generic: true, categoryNames: 'AUSNUT 2023' })));
+  }
+  if ((m = p.match(/^\/ausnut\/food\/(\d+)$/))) {
+    const f = N.ausnutById(m[1]);
+    if (!f) return json(res, 404, { error: 'no such AUSNUT food' });
+    const v = (code, name, value, unit) => ({ value, component: { code, name }, unit: { code: unit } });
+    return json(res, 200, { id: Number(f.id), foodid: Number(f.id), name: f.name.trim(), values: [
+      v('ENERCC', 'Energy', f.kcal, 'kcal'), v('PROT625', 'Protein', f.protein, 'g'), v('CHO', 'Available carbohydrate', f.carbs, 'g'),
+      v('FAT', 'Total fat', f.fat, 'g'), v('FIBT', 'Dietary fibre', f.fibre, 'g'), v('SUGAR', 'Total sugars', f.sugars, 'g'),
+      v('NA', 'Sodium', f.sodium, 'mg')] });
+  }
+  // FamilyMeal recipes in Mealie's API shape (nutrition per serving).
+  if (p === '/mealie/api/recipes') {
+    const term = ((url.searchParams.get('queryFilter') || '').match(/LIKE "%(.*)%"/) || [])[1] || '';
+    const per = Math.min(Number(url.searchParams.get('perPage')) || 10, 50);
+    const page = Math.max(Number(url.searchParams.get('page')) || 1, 1);
+    const rows = q(`SELECT id, title FROM recipes WHERE deleted=0 AND ingredients IS NOT NULL AND lower(title) LIKE ? ORDER BY title`)
+      .all(`%${term.toLowerCase()}%`);
+    return json(res, 200, { total: rows.length, items: rows.slice((page - 1) * per, page * per).map((r) => ({ slug: r.id, id: r.id, name: r.title })) });
+  }
+  if ((m = p.match(/^\/mealie\/api\/recipes\/([^/]+)$/))) {
+    const r = q('SELECT * FROM recipes WHERE id=? AND deleted=0').get(m[1]);
+    if (!r) return json(res, 404, { detail: 'not found' });
+    const v = recipeView(r);
+    return json(res, 200, { slug: r.id, id: r.id, name: r.title, image: null, orgURL: `${FM}/recipes/${r.id}`, recipeServings: v.servings,
+      nutrition: { calories: v.perServing.kcal, proteinContent: v.perServing.protein, carbohydrateContent: v.perServing.carbs, fatContent: v.perServing.fat } });
+  }
+
   if (!p.startsWith('/api/')) return json(res, 404, { error: 'not found' });
 
   const u = await sparkyUser(req);
   if (!u) return json(res, 401, { error: 'Sign in to SparkyFitness first' });
-  let m;
 
   if (p === '/api/me') return json(res, 200, { name: u.name, sync: status });
   if (p === '/api/sync' && req.method === 'POST') { syncAll(); return json(res, 202, status); }
