@@ -51,6 +51,8 @@ services:
       - ./data/uploads:/app/SparkyFitnessServer/uploads
       # Built by scripts/apply-patches.sh from the pinned image + carter/patches (rerun after changing SPARKY_VERSION).
       - ./patched/swissFoodService.ts:/app/SparkyFitnessServer/integrations/swissfood/swissFoodService.ts:ro
+      # carter/patches/anthropic-websearch.patch: lets Claude (Anthropic service) search the web for food nutrition.
+      - ./patched/chatService.ts:/app/SparkyFitnessServer/services/chatService.ts:ro
     depends_on:
       sparkyfitness-db:
         condition: service_healthy

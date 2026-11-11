@@ -1,0 +1,15 @@
+--- a/SparkyFitnessServer/services/chatService.ts
++++ b/SparkyFitnessServer/services/chatService.ts
+@@ -873,6 +873,12 @@
+   modelName: string,
+   apiKey?: string | null
+ ) {
++  // Carter: Claude's server-side web search, for restaurant/brand nutrition the databases lack.
++  if (serviceType === 'anthropic')
++    return createAnthropic({ apiKey: apiKey ?? undefined }).tools.webSearch_20250305({
++      maxUses: 3,
++      userLocation: { type: 'approximate', country: 'AU', timezone: 'Australia/Perth' },
++    });
+   return serviceType === 'openai' && isGpt6Model(modelName)
+     ? createOpenAI({ apiKey: apiKey ?? undefined }).tools.webSearch({
+         searchContextSize: 'high',

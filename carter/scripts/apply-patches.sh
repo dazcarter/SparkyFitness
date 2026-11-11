@@ -10,3 +10,6 @@ mkdir -p patched
 docker run --rm --entrypoint cat "$IMG" /app/SparkyFitnessServer/integrations/swissfood/swissFoodService.ts > patched/swissFoodService.ts
 patch --forward --quiet -p2 patched/swissFoodService.ts < patches/swissfood-lan.patch
 echo "patched swissFoodService.ts for $IMG"
+docker run --rm --entrypoint cat "$IMG" /app/SparkyFitnessServer/services/chatService.ts > patched/chatService.ts
+patch --forward --quiet -p2 patched/chatService.ts < patches/anthropic-websearch.patch
+echo "patched chatService.ts for $IMG"

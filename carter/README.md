@@ -73,6 +73,16 @@ No data is imported into SparkyFitness; the bridge answers live, like any other 
 - Single-file bind mounts (`nginx/tracker.conf`, `patched/*.ts`) need `--force-recreate` on that service after the
   file is replaced, or the container keeps the old file.
 
+## AI chat (Ask Sparky)
+
+- Global AI service "Claude" (Anthropic, `claude-haiku-5-5`), key added by Darren in Admin → Global AI Settings
+  (billed on his console.anthropic.com account).
+- `patches/anthropic-websearch.patch` (mounted over `services/chatService.ts`) gives Claude Anthropic's server-side
+  web search (max 3 searches per message, AU location); upstream only enables it for OpenAI GPT-6. Searches cost
+  extra on the Anthropic bill (about US$10 per 1,000).
+- The service's system prompt (edit in Admin → Global AI Settings) tells it to web-search restaurant/brand foods
+  missing from the databases.
+
 ## Phone setup (each person)
 
 1. Connect to home Wi-Fi or WireGuard, open https://tracker.carterhome.com.au, **Sign Up**.

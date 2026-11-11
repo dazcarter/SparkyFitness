@@ -50,3 +50,4 @@
   `FAMILYMEAL_API_KEY` (one-tap login removed) and re-checks FamilyMeal on search (max once/min), so new recipes
   show up in search straight away. Verified: bad/missing key 401, SparkyFitness search as Darren returns recipes.
 - Phone app: 10-min capture showed no requests from the phone at all (not reaching the tracker).
+- 21:3x Darren added a Claude (Anthropic) global AI service. Patched chatService.ts (patches/anthropic-websearch.patch) so Claude gets web search; live test with the stored key found Betty's nutrition. Service system prompt set to web-search missing restaurant foods. Backup /root/tracker-pre-websearch-*.tgz in CT 107.
