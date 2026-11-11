@@ -83,6 +83,14 @@ No data is imported into SparkyFitness; the bridge answers live, like any other 
 - The service's system prompt (edit in Admin → Global AI Settings) tells it to web-search restaurant/brand foods
   missing from the databases.
 
+## Claude on Darren's PC (MCP)
+
+- SparkyFitness serves MCP at `https://tracker.carterhome.com.au/mcp` (LAN/VPN only, so claude.ai / phone
+  connectors can't reach it).
+- Full-access API key "Claude on Darren PC (MCP)", no expiry, created 2026-11-11 for Darren. Stored only on the PC:
+  `~/.config/sparky/mcp-key`, Claude Code user config (`~/.claude.json`, server `sparky`), and
+  `~/.config/Claude/claude_desktop_config.json` (via `npx mcp-remote`). Revoke in Settings → API Key Management.
+
 ## Phone setup (each person)
 
 1. Connect to home Wi-Fi or WireGuard, open https://tracker.carterhome.com.au, **Sign Up**.
