@@ -32,8 +32,7 @@
 - FamilyMeal's login page lists every user id, and its `one-tap` provider signs in with only an id (no role check
   server-side). It is LAN/VPN only (no public DNS), but anyone on the network can sign in as anyone, including the
   admin, by calling the API. Not changed (FamilyMeal is out of scope); worth fixing in FamilyMeal.
-- The bridge uses one-tap as a family **member** account (`FAMILYMEAL_USER_ID` in `.env`) and only does GETs.
-  A dedicated FamilyMeal account with email+password is better; set `FAMILYMEAL_EMAIL`/`FAMILYMEAL_PASSWORD`.
+- The bridge now uses FamilyMeal's read-only Recipe API key (`FAMILYMEAL_API_KEY`), no FamilyMeal user login.
 - Sign-up is open on the tracker (LAN/VPN only). After the family has accounts, set
   `SPARKY_FITNESS_DISABLE_SIGNUP=true` in `/opt/tracker/.env` and `docker compose up -d`.
 
@@ -45,3 +44,9 @@
   `from="192.168.0.2"`). pve-cert-renew + tracker-cert-sync ran clean; Proxmox UI and tracker certs valid to 8 Feb 2027.
 - Darren tested search/barcode and phone sync. Added git remote `fork` = git@github.com:dazcarter/SparkyFitness.git;
   Darren created the fork; `carter` pushed to https://github.com/dazcarter/SparkyFitness (tracks `fork/carter`).
+- 20:0x Darren asked for a FamilyMeal API. Built in FamilyMeal (VM 102, snapshot `pre-recipe-api-20261111` + DB copy
+  `/root/fm-backups/familymeal-20261111-pre-api.db` first): read-only `/api/v1/recipes[/:id]` with a hashed household
+  API key (Settings -> Recipe API), commit ee049fe on `redesign/sunday-table`, pushed. Bridge now uses
+  `FAMILYMEAL_API_KEY` (one-tap login removed) and re-checks FamilyMeal on search (max once/min), so new recipes
+  show up in search straight away. Verified: bad/missing key 401, SparkyFitness search as Darren returns recipes.
+- Phone app: 10-min capture showed no requests from the phone at all (not reaching the tracker).

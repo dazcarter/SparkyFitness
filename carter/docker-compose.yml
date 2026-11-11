@@ -72,10 +72,8 @@ services:
       TZ: Australia/Perth
       SPARKY_INTERNAL_URL: http://sparkyfitness-server:3010
       FAMILYMEAL_URL: ${FAMILYMEAL_URL:-https://meals.carterhome.com.au}
-      # Either a FamilyMeal email+password, or a family-member user id (FamilyMeal's one-tap login).
-      FAMILYMEAL_EMAIL: ${FAMILYMEAL_EMAIL:-}
-      FAMILYMEAL_PASSWORD: ${FAMILYMEAL_PASSWORD:-}
-      FAMILYMEAL_USER_ID: ${FAMILYMEAL_USER_ID:-}
+      # Read-only key from FamilyMeal Settings -> Recipe API.
+      FAMILYMEAL_API_KEY: ${FAMILYMEAL_API_KEY:?set FAMILYMEAL_API_KEY in .env}
     volumes:
       - ./data/bridge:/data
     depends_on:

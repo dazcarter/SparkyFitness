@@ -24,9 +24,12 @@ measurements, barcode scanning (Open Food Facts), calorie/macro targets, exercis
 
 ## FamilyMeal recipe import (`/familymeal/`)
 
-- Reads FamilyMeal **only over its HTTP API** (`/api/recipes`, `/api/recipes/:id`), never its SQLite DB.
-  Login: `FAMILYMEAL_EMAIL`+`FAMILYMEAL_PASSWORD`, or `FAMILYMEAL_USER_ID` (FamilyMeal's passwordless family-member
-  login). Requests are spaced 1.2 s apart because FamilyMeal's nginx allows 60/min.
+- Reads FamilyMeal **only over its read-only Recipe API** (`/api/v1/recipes`, `/api/v1/recipes/:id`), never its
+  SQLite DB. Auth: `FAMILYMEAL_API_KEY` in `.env` (FamilyMeal → Settings → Recipe API; generating a new key there
+  breaks the bridge until `.env` is updated and `docker compose up -d familymeal-bridge` is run).
+  Requests are spaced 1.2 s apart because FamilyMeal's nginx allows 60/min.
+- New recipes: any search (SparkyFitness food search or `/familymeal/`) re-checks FamilyMeal at most once a minute,
+  so a recipe added in FamilyMeal shows up on the next search.
 - Every ingredient line (amount, unit, item) is matched to **AUSNUT 2023** (FSANZ, `data/ausnut.json`, built by
   `tools/build_ausnut.py`) and falls back to **Open Food Facts** (Australian products) when AUSNUT has no good match.
   Units become grams with Australian measures (tbsp = 20 ml, cup = 250 ml) and AUSNUT densities / piece weights.
@@ -36,7 +39,7 @@ measurements, barcode scanning (Open Food Facts), calorie/macro targets, exercis
   SparkyFitness session (same-origin cookie). The food also shows up in normal SparkyFitness search afterwards.
 - Review: orange lines are guesses worth ≥ 25 kcal. Tap one to search AUSNUT/OFF, enter per-100 g values, or set grams.
   A food choice is remembered for that ingredient in every recipe; a grams change applies to that line.
-- Re-sync: every 6 h, on "Re-sync", or "Refresh from FamilyMeal" on one recipe. Only recipes whose `updatedAt`
+- Re-sync: on search (above), every 6 h, on "Re-sync", or "Refresh from FamilyMeal" on one recipe. Only recipes whose `updatedAt`
   changed are re-fetched; changed lines are re-matched, hand-corrected unchanged lines are kept. Past diary entries
   keep their own snapshot; the next log uses the new values.
 - Tests: `node familymeal-bridge/test/nutrition.test.mjs`.

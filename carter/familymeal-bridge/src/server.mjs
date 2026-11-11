@@ -41,48 +41,20 @@ if (MATCHER_CHANGED) {
 
 // ---------------------------------------------------------------- FamilyMeal client (read only)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-let fmCookies = '';
 let fmLast = 0;
 async function fmThrottle() {
   const wait = fmLast + FM_GAP_MS - Date.now();
   if (wait > 0) await sleep(wait);
   fmLast = Date.now();
 }
-const cookieHeader = (res) =>
-  (res.headers.getSetCookie?.() || []).map((c) => c.split(';')[0]).filter((c) => !c.endsWith('=')).join('; ');
 
-async function fmLogin() {
+// FamilyMeal's read-only Recipe API (Settings -> Recipe API key).
+async function fmGet(path) {
+  if (!ENV.FAMILYMEAL_API_KEY) throw new Error('FAMILYMEAL_API_KEY not set (FamilyMeal Settings -> Recipe API)');
   await fmThrottle();
-  const r1 = await fetch(`${FM}/api/auth/csrf`);
-  const jar = cookieHeader(r1);
-  const { csrfToken } = await r1.json();
-  const body = new URLSearchParams({ csrfToken, json: 'true' });
-  let provider;
-  if (ENV.FAMILYMEAL_EMAIL) {
-    provider = 'credentials';
-    body.set('email', ENV.FAMILYMEAL_EMAIL);
-    body.set('password', ENV.FAMILYMEAL_PASSWORD || '');
-  } else if (ENV.FAMILYMEAL_USER_ID) {
-    provider = 'one-tap'; // FamilyMeal's own passwordless family-member login
-    body.set('userId', ENV.FAMILYMEAL_USER_ID);
-  } else throw new Error('FamilyMeal login not configured (FAMILYMEAL_EMAIL/PASSWORD or FAMILYMEAL_USER_ID)');
-  await fmThrottle();
-  const r2 = await fetch(`${FM}/api/auth/callback/${provider}`, {
-    method: 'POST', redirect: 'manual', body,
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Cookie: jar },
-  });
-  const session = cookieHeader(r2);
-  if (!/session-token/.test(session)) throw new Error(`FamilyMeal login failed (HTTP ${r2.status})`);
-  fmCookies = session;
-}
-
-async function fmGet(path, retry = true) {
-  if (!fmCookies) await fmLogin();
-  await fmThrottle();
-  const r = await fetch(`${FM}${path}`, { headers: { Cookie: fmCookies } });
-  if (r.status === 401 && retry) { fmCookies = ''; return fmGet(path, false); }
-  if (r.status === 429 || r.status === 503) { await sleep(15000); return fmGet(path, retry); }
-  if (!r.ok) throw new Error(`FamilyMeal ${path}: HTTP ${r.status}`);
+  const r = await fetch(`${FM}/api/v1${path}`, { headers: { Authorization: `Bearer ${ENV.FAMILYMEAL_API_KEY}` } });
+  if (r.status === 429 || r.status === 503) { await sleep(15000); return fmGet(path); }
+  if (!r.ok) throw new Error(`FamilyMeal /api/v1${path}: HTTP ${r.status}`);
   return r.json();
 }
 
@@ -142,7 +114,7 @@ const round = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Ma
 // ---------------------------------------------------------------- sync
 const status = { running: false, lastRun: null, lastError: null, recipes: 0, changed: 0 };
 async function fetchDetail(id) {
-  const d = await fmGet(`/api/recipes/${encodeURIComponent(id)}`);
+  const d = await fmGet(`/recipes/${encodeURIComponent(id)}`);
   q(`UPDATE recipes SET title=?, servings=?, updated_at=?, image_url=?, ingredients=?, fetched_at=? WHERE id=?`)
     .run(d.title, d.baseServings || 1, d.updatedAt, d.imageUrl || null,
       JSON.stringify((d.ingredients || []).map(({ id: iid, amount, unit, item }) => ({ id: iid, amount, unit, item }))),
@@ -154,7 +126,7 @@ async function syncAll() {
   if (status.running) return status;
   Object.assign(status, { running: true, lastError: null, changed: 0 });
   try {
-    const list = await fmGet('/api/recipes');
+    const { recipes: list } = await fmGet('/recipes');
     const seen = new Set();
     for (const r of list) {
       seen.add(r.id);
@@ -175,6 +147,12 @@ async function syncAll() {
     status.lastRun = new Date().toISOString();
   }
   return status;
+}
+
+// Searches pick up new/changed recipes: re-check FamilyMeal at most once a minute, wait up to 8 s.
+async function freshen() {
+  if (status.running || Date.now() - Date.parse(status.lastRun || 0) < 60_000) return;
+  await Promise.race([syncAll(), sleep(8000)]);
 }
 
 // ---------------------------------------------------------------- SparkyFitness (as the signed-in user)
@@ -263,6 +241,7 @@ async function route(req, res) {
   }
   // FamilyMeal recipes in Mealie's API shape (nutrition per serving).
   if (p === '/mealie/api/recipes') {
+    await freshen();
     const term = ((url.searchParams.get('queryFilter') || '').match(/LIKE "%(.*)%"/) || [])[1] || '';
     const per = Math.min(Number(url.searchParams.get('perPage')) || 10, 50);
     const page = Math.max(Number(url.searchParams.get('page')) || 1, 1);
@@ -286,6 +265,7 @@ async function route(req, res) {
   if (p === '/api/me') return json(res, 200, { name: u.name, sync: status });
   if (p === '/api/sync' && req.method === 'POST') { syncAll(); return json(res, 202, status); }
   if (p === '/api/recipes' && req.method === 'GET') {
+    await freshen();
     const s = `%${(url.searchParams.get('q') || '').toLowerCase()}%`;
     const rows = q(`SELECT * FROM recipes WHERE deleted=0 AND ingredients IS NOT NULL AND lower(title) LIKE ? ORDER BY title`).all(s);
     return json(res, 200, rows.map((r) => { const v = recipeView(r); delete v.lines; return v; }));
