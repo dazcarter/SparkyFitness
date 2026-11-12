@@ -53,3 +53,6 @@
 - 21:3x Darren added a Claude (Anthropic) global AI service. Patched chatService.ts (patches/anthropic-websearch.patch) so Claude gets web search; live test with the stored key found Betty's nutrition. Service system prompt set to web-search missing restaurant foods. Backup /root/tracker-pre-websearch-*.tgz in CT 107.
 - 21:5x Sparky MCP connected to Claude Code + Claude Desktop on Darren's PC (new full-access key, never displayed; configs backed up as *.bak-20261111-sparky). Claude Code: sparky ✔ Connected.
 - 2026-11-12 Darren OK'd public Claude connector: tracker hostname on ha-tunnel (API token), Darren added DNS CNAME, nginx limits tunnel to MCP + OAuth sign-in, MCP OAuth on (Claude callbacks only). Verified via Cloudflare: /, /api/*, /familymeal 404; /mcp 401 with resource metadata; foreign redirect refused.
+
+## Security audit — 2026-11-12
+Public tunnel probed: only /login, /api/auth/*, /api/identity/*, /mcp, OAuth discovery and static assets answer; everything else 404; path-traversal variants blocked. Found open registration (SPARKY_FITNESS_DISABLE_SIGNUP unset) — set to true in /opt/tracker/.env on CT 107 (backup .env.bak-20261112-signup). Verified signup now returns "Signups are currently disabled". Remaining: MFA not mandatory; no rate limit on /login beyond app defaults.
